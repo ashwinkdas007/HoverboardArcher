@@ -8,7 +8,7 @@ public class TerrainManager : MonoBehaviour {
     
 
     float xLength;
-    public float vertexSpacing = .1f;
+    public float vertexSpacing = 1f;
 
     public float baseAmplitude = 2;
     public float baseWavelength = 3;
