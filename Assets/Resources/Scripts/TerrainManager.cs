@@ -17,7 +17,7 @@ public class TerrainManager : MonoBehaviour {
     public float lacunarity = 2;
 
     public int seed = 100;
-    float shift = 0.5f;
+    float shift = 0.51f;
     static float offset = 100000;
 
     public EdgeCollider2D coll;
@@ -25,19 +25,33 @@ public class TerrainManager : MonoBehaviour {
     Vector3[] terrainVertices;
     int numOfVertices;
 
+    public float rateOfVerticeShift = 1;
+    float lineResetPeriod = 12.0f;
+    float timer = 0.0f;
+
     // Use this for initialization
     void Start () {
-        CalculateTerrainVertices();
+        CalculateTerrainVertices((ProbabilityFunctions.DiceRoll(50)+1)*1000);
         SetLineRenderer();
-        SetCollider();
+       // SetCollider();
     }
-	
-	// Update is called once per frame
-	/*void Update () {
-		
-	}*/
 
-    void CalculateTerrainVertices()
+    // Update is called once per frame
+    void Update()
+    {
+        moveTerrainVertices();
+        timer += Time.deltaTime;
+
+        if (timer >= lineResetPeriod)
+        {
+            timer = 0.0f;
+            line.positionCount = 0;
+            CalculateTerrainVertices(40);
+            SetLineRenderer();
+        }
+    }
+
+    void CalculateTerrainVertices(float offsetModifier = 0.0f)
     {
         float x, y, currentAmplitude, currentWavelength, vieportHalfHeight, vieportHalfWidth;
 
@@ -47,10 +61,12 @@ public class TerrainManager : MonoBehaviour {
         xLength = vieportHalfWidth * 3;
 
         numOfVertices = Mathf.CeilToInt(xLength / vertexSpacing);
-        Debug.Log("vertexSpacing : " + vertexSpacing);
+        //Debug.Log("vertexSpacing : " + vertexSpacing);
         terrainVertices = new Vector3[numOfVertices];
 
-        
+        offset += offsetModifier;
+
+
         for (int i = 0; i < numOfVertices; i++)
         {
             x = i * vertexSpacing - xLength / 2;
@@ -63,7 +79,7 @@ public class TerrainManager : MonoBehaviour {
 
                 y += currentAmplitude * (Mathf.PerlinNoise((i * vertexSpacing / currentWavelength) + offset + shift, seed + shift) - 0.5f);
             }
-            terrainVertices[i] = new Vector3(x, y, 0.0f);
+            terrainVertices[i] = new Vector3(x + (vieportHalfWidth/2.1f), y, 0.0f);
             //line.SetPosition(i, new Vector3(x, y, 0.0f));
         }
     }
@@ -74,13 +90,24 @@ public class TerrainManager : MonoBehaviour {
         line.SetPositions(terrainVertices);
     }
 
-    void SetCollider()
+    //void SetCollider()
+    //{
+    //    Vector2[] vertex2s = new Vector2[numOfVertices];
+    //    for (int i = 0; i < numOfVertices; i++)
+    //    {
+    //        vertex2s[i] = terrainVertices[i];
+    //    }
+    //    coll.points = vertex2s;
+    //}
+
+    void moveTerrainVertices()
     {
-        Vector2[] vertex2s = new Vector2[numOfVertices];
-        for (int i = 0; i < numOfVertices; i++)
-        {
-            vertex2s[i] = terrainVertices[i];
-        }
-        coll.points = vertex2s;
+        Vector3[] vertices = new Vector3[numOfVertices];
+        line.GetPositions(vertices);
+
+        for(int i = 0; i < numOfVertices; i++)
+            vertices[i].x -= rateOfVerticeShift * Time.deltaTime;
+
+        line.SetPositions(vertices);
     }
 }
