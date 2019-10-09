@@ -4,8 +4,11 @@ using UnityEngine;
 
 public class TerrainManager : MonoBehaviour {
 
-    public LineRenderer line;
-    
+    public LineRenderer line, line2;
+
+    private Camera mainCamera;
+    private Vector2 screenBounds;
+    float vieportHalfHeight, vieportHalfWidth;
 
     float xLength;
     public float vertexSpacing = 1f;
@@ -31,63 +34,70 @@ public class TerrainManager : MonoBehaviour {
 
     // Use this for initialization
     void Start () {
-        CalculateTerrainVertices((ProbabilityFunctions.DiceRoll(50)+1)*1000);
-        SetLineRenderer();
-       // SetCollider();
+        mainCamera = Camera.main;
+        screenBounds = mainCamera.ScreenToWorldPoint(new Vector3(Screen.width, Screen.height, mainCamera.transform.position.z));
+        vieportHalfHeight = mainCamera.orthographicSize;
+        vieportHalfWidth = mainCamera.aspect * vieportHalfHeight;
+        xLength = vieportHalfWidth * 2;
+        numOfVertices = Mathf.CeilToInt(xLength / vertexSpacing);
+        terrainVertices = new Vector3[numOfVertices];
+        //line2 = Instantiate<LineRenderer>(line);
+
+
+        CalculateTerrainVertices(ref terrainVertices, (ProbabilityFunctions.DiceRoll(50)+1)*1000);
+        SetTerrain(line);
+        CalculateTerrainVertices(ref terrainVertices, offset);
+        SetTerrain(line2);
+        // SetCollider();
     }
 
     // Update is called once per frame
     void Update()
     {
-        moveTerrainVertices();
-        timer += Time.deltaTime;
+        moveTerrainVertices(line);
+        moveTerrainVertices(line2);
+        repositionTerrain(line, line2);
+        //timer += Time.deltaTime;
 
-        if (timer >= lineResetPeriod)
-        {
-            timer = 0.0f;
-            line.positionCount = 0;
-            CalculateTerrainVertices(40);
-            SetLineRenderer();
-        }
+        //if (timer >= lineResetPeriod)
+        //{
+            //timer = 0.0f;
+           // CalculateTerrainVertices(xLength); //, line.GetPosition(numOfVertices-1)
+            //line.positionCount = 0;
+            //SetLineRenderer();
+        //}
     }
 
-    void CalculateTerrainVertices(float offsetModifier = 0.0f)
+    void CalculateTerrainVertices(ref Vector3[] terrainVertices, float offsetModifier = 0.0f)
     {
-        float x, y, currentAmplitude, currentWavelength, vieportHalfHeight, vieportHalfWidth;
-
-        vieportHalfHeight = Camera.main.orthographicSize;
-        vieportHalfWidth = Camera.main.aspect * vieportHalfHeight;
-
-        xLength = vieportHalfWidth * 3;
-
-        numOfVertices = Mathf.CeilToInt(xLength / vertexSpacing);
-        //Debug.Log("vertexSpacing : " + vertexSpacing);
-        terrainVertices = new Vector3[numOfVertices];
+        float x, y, currentAmplitude, currentWavelength;
+        Vector3[] vertices = new Vector3[numOfVertices];
 
         offset += offsetModifier;
 
-
         for (int i = 0; i < numOfVertices; i++)
         {
-            x = i * vertexSpacing - xLength / 2;
+            x =  (i * vertexSpacing  -xLength / 2); //
             y = 0;
-            //y = Mathf.Sin(i * vertexSpacing / wavelength) * amplitude;
+
             for (int oct = 0; oct < numOfOctaves; oct++)
             {
                 currentAmplitude = baseAmplitude / Mathf.Pow(lacunarity, oct);
                 currentWavelength = baseWavelength / Mathf.Pow(lacunarity, oct);
 
-                y += currentAmplitude * (Mathf.PerlinNoise((i * vertexSpacing / currentWavelength) + offset + shift, seed + shift) - 0.5f);
+                y += currentAmplitude * (Mathf.PerlinNoise((x / currentWavelength) + offset + shift, seed + shift) - 0.5f);
             }
-            terrainVertices[i] = new Vector3(x + (vieportHalfWidth/2.1f), y, 0.0f);
-            //line.SetPosition(i, new Vector3(x, y, 0.0f));
+            x += ((terrainVertices.Length > 0 && terrainVertices != null) ? terrainVertices[terrainVertices.Length - 1].x : 0); //+ xLength / 3
+            //y += ((terrainVertices.Length > 0 && terrainVertices != null) ? terrainVertices[terrainVertices.Length - 1].y : 0);
+            vertices[i] = new Vector3(x , y, 0.0f);
         }
+        terrainVertices = vertices;
     }
 
-    void SetLineRenderer()
+    void SetTerrain(LineRenderer l)
     {
-        line.positionCount = numOfVertices;
-        line.SetPositions(terrainVertices);
+        l.positionCount = numOfVertices;
+        l.SetPositions(terrainVertices);
     }
 
     //void SetCollider()
@@ -100,14 +110,51 @@ public class TerrainManager : MonoBehaviour {
     //    coll.points = vertex2s;
     //}
 
-    void moveTerrainVertices()
+    void moveTerrainVertices(LineRenderer l)
     {
         Vector3[] vertices = new Vector3[numOfVertices];
-        line.GetPositions(vertices);
+        l.GetPositions(vertices);
 
-        for(int i = 0; i < numOfVertices; i++)
+        for (int i = 0; i < numOfVertices; i++)
             vertices[i].x -= rateOfVerticeShift * Time.deltaTime;
 
-        line.SetPositions(vertices);
+        l.SetPositions(vertices);
+    }
+
+    /*void loadTerrain()
+    {
+        LineRenderer c;
+        for (int i = 0; i <= 1; i++)
+        {
+            c = gameObject.AddComponent<LineRenderer>();
+            c.transform.SetParent(line.transform);
+            c.transform.position = line.GetPosition();
+            c.name = obj.name + i;
+        }
+        Destroy(clone);
+        Destroy(obj.GetComponent<SpriteRenderer>());
+    }*/
+
+   void repositionTerrain(LineRenderer first, LineRenderer second)
+    {
+        float halfObjectWidth = xLength / 2;
+
+        if (mainCamera.transform.position.x + screenBounds.x > second.GetPosition(numOfVertices - 1).x) //+ halfObjectWidth
+        {
+            //first.transform.SetAsLastSibling();
+            //first.transform.position = new Vector3(second.transform.position.x + halfObjectWidth * 2, second.transform.position.y, second.transform.position.z);
+            CalculateTerrainVertices(ref terrainVertices, offset);
+            first.positionCount = 0;
+            SetTerrain(first);
+        }
+        else if (mainCamera.transform.position.x - screenBounds.x < first.GetPosition(numOfVertices - 1).x)
+        {
+            //second.transform.SetAsFirstSibling();
+            //second.transform.position = new Vector3(first.transform.position.x - halfObjectWidth * 2, first.transform.position.y, first.transform.position.z);
+            CalculateTerrainVertices(ref terrainVertices, offset);
+            second.positionCount = 0;
+            SetTerrain(second);
+        }
+        
     }
 }
